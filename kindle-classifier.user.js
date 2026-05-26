@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Kindle Book Auto Classifier
 // @namespace    http://tampermonkey.net/
-// @version      2.6.0
+// @version      2.7.0
 // @description  Auto-classify unclassified Kindle books into collections using AI API, via UI simulation
 // @author       Claude
 // @match        https://www.amazon.com/hz/mycd/digital-console/contentlist/*
@@ -76,14 +76,14 @@ CRITICAL RULES:
   function updateProgress(current, total, phase) { state.progress = { current, total, phase }; renderProgress(); }
 
   // ======================== DOM PARSING ========================
-  function parseBooksFromDocument(doc) {
+  function parseBooksFromDocument(doc, currentPage = null) {
     const books = [];
     const containers = doc.querySelectorAll('[class*="DigitalEntitySummary-module__container"]');
-    containers.forEach(c => parseBookRow(c, books));
+    containers.forEach(c => parseBookRow(c, books, currentPage));
     return books;
   }
 
-  function parseBookRow(container, books) {
+  function parseBookRow(container, books, currentPage = null) {
     try {
       // --- ASIN ---
       let asin = null;
@@ -115,7 +115,7 @@ CRITICAL RULES:
         break;
       }
 
-      // --- hasCollection (RELIABLE: check for "Collection(s) with this item:") ---
+      // --- hasCollection ---
       let hasCollection = false;
       const existingCollections = [];
 
@@ -130,9 +130,6 @@ CRITICAL RULES:
       }
 
       // Method 2: check ALL information_row for "Collection(s) with this item:"
-      // This is the MOST RELIABLE method because:
-      // - Unclassified: "In1DeviceDevice(s) with this item:..."
-      // - Classified: "In1CollectionCollection(s) with this item:...1DeviceDevice(s)..."
       if (!hasCollection) {
         const allInfoRows = container.querySelectorAll('.information_row');
         for (const row of allInfoRows) {
@@ -150,14 +147,7 @@ CRITICAL RULES:
         }
       }
 
-      // NOTE: We do NOT check dropdown_count because it can be "1" for devices too!
-
-      // Debug: log detection
-      if (!hasCollection) {
-        console.log(`[KindleClassifier] UNCLASSIFIED: "${title}" (${asin})`);
-      }
-
-      books.push({ asin, title, author, hasCollection, existingCollections });
+      books.push({ asin, title, author, hasCollection, existingCollections, pageNumber: currentPage });
     } catch (e) { /* skip */ }
   }
 
@@ -235,7 +225,7 @@ CRITICAL RULES:
     // Store current page books
     let allBooks = [];
     const seenAsins = new Set();
-    parseBooksFromDocument(document).forEach(b => { seenAsins.add(b.asin); allBooks.push(b); });
+    parseBooksFromDocument(document, currentPage).forEach(b => { seenAsins.add(b.asin); allBooks.push(b); });
     log(`Page ${currentPage}: ${allBooks.length} books`, 'info');
 
     // Save state before navigation
@@ -542,12 +532,28 @@ Include all ${books.length} books. Use 0-based index.`;
 
   async function applyClassifications(classified) {
     let ok = 0, fail = 0;
-    for (let i = 0; i < classified.length; i++) {
-      updateProgress(i + 1, classified.length, 'Applying');
-      (await applyOneBook(classified[i])) ? ok++ : fail++;
-      if (i < classified.length - 1) await sleep(1200 + Math.random() * 1500);
+
+    // Only apply books that are on the current page
+    const currentPage = parseInt(new URLSearchParams(window.location.search).get('pageNumber')) || 1;
+    const booksOnCurrentPage = classified.filter(b => {
+      // If pageNumber is not set, assume it's on current page
+      return !b.pageNumber || b.pageNumber === currentPage;
+    });
+
+    const booksOnOtherPages = classified.filter(b => b.pageNumber && b.pageNumber !== currentPage);
+
+    if (booksOnOtherPages.length > 0) {
+      log(`Note: ${booksOnOtherPages.length} books are on other pages and will be skipped`, 'warn');
+      log(`Applying ${booksOnCurrentPage.length} books on current page...`, 'info');
     }
-    return { ok, fail };
+
+    for (let i = 0; i < booksOnCurrentPage.length; i++) {
+      updateProgress(i + 1, booksOnCurrentPage.length, 'Applying');
+      (await applyOneBook(booksOnCurrentPage[i])) ? ok++ : fail++;
+      if (i < booksOnCurrentPage.length - 1) await sleep(1200 + Math.random() * 1500);
+    }
+
+    return { ok, fail, skipped: booksOnOtherPages.length };
   }
 
   // ======================== PROCESSING ========================
@@ -817,8 +823,13 @@ Include all ${books.length} books. Use 0-based index.`;
       state.applying = true; updateButtonStates();
       try {
         log(`Applying ${valid.length} books — keep tab visible!`, 'warn');
-        const { ok, fail } = await applyClassifications(valid);
-        log(`Applied: ${ok} ok, ${fail} failed`, ok > 0 ? 'success' : 'error');
+        const { ok, fail, skipped } = await applyClassifications(valid);
+
+        if (skipped > 0) {
+          log(`Applied: ${ok} ok, ${fail} failed, ${skipped} skipped (on other pages)`, ok > 0 ? 'success' : 'warn');
+        } else {
+          log(`Applied: ${ok} ok, ${fail} failed`, ok > 0 ? 'success' : 'error');
+        }
 
         // Auto-refresh after successful application
         if (ok > 0) {
@@ -898,7 +909,7 @@ Include all ${books.length} books. Use 0-based index.`;
             return containers.length > 0 ? true : null;
           }, 10000, 500).then(() => {
             // Merge current page books
-            const currentBooks = parseBooksFromDocument(document);
+            const currentBooks = parseBooksFromDocument(document, currentPage);
             const seenAsins = new Set(state.seenAsins);
             let newCount = 0;
             currentBooks.forEach(b => {
