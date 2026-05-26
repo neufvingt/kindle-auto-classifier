@@ -34,8 +34,8 @@ CRITICAL RULES:
     pageDelayMs: 2000,
     maxRetries: 3,
     maxTokens: 4000,  // Increased for longer responses
-    dialogOpenTimeout: 5000,
-    dialogCloseTimeout: 8000,
+    dialogOpenTimeout: 2000,
+    dialogCloseTimeout: 1000,
   };
 
   // ======================== STATE ========================
