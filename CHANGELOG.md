@@ -14,6 +14,18 @@ All notable changes to this project will be documented in this file.
 - Improved multi-page scanning reliability
 - Better error messages and user feedback
 
+## [3.0.0] - 2026-05-28
+
+### Changed
+- Removed the `Scan All` flow and the fragile cross-page scan state
+- Reworked the script around a single-page scan -> classify -> apply pipeline
+- Added `Auto Process` mode to finish the current page and continue to the next page automatically
+- Added a configurable next-page delay for auto mode
+
+### Fixed
+- Eliminated the mismatch between cross-page scanning and current-page-only apply behavior
+- Tightened AI response validation for invalid indexes, missing items, and unknown collections
+
 ## [2.6.0] - 2025-01-XX
 
 ### Added

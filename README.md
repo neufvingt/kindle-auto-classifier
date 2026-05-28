@@ -12,12 +12,11 @@ A Tampermonkey userscript that automatically classifies your unorganized Kindle 
 
 ### Features
 
-- 🤖 **AI-Powered Classification**: Uses OpenAI API (or compatible APIs) to intelligently categorize books
-- 📚 **Multi-Page Scanning**: Automatically scans all pages of your Kindle library
-- 🎯 **Batch Processing**: Classifies multiple books at once
-- 🔄 **Auto-Apply**: Simulates UI interactions to add books to collections
-- 💾 **Persistent Settings**: Saves your API configuration locally
-- 🎨 **Clean UI**: Draggable panel with real-time progress tracking
+- AI-powered classification with OpenAI-compatible APIs
+- Single-page closed loop: scan, classify, and apply on the current page
+- Auto Process mode: finish the current page, then continue to the next page automatically
+- Batch processing for lower API overhead
+- Draggable control panel with progress and logs
 
 ### Prerequisites
 
@@ -44,10 +43,10 @@ A Tampermonkey userscript that automatically classifies your unorganized Kindle 
    - Select "Add or Remove from Collection"
    - Click the "Refresh" button in the panel
 5. **Classify books**:
-   - Click "Scan All" to scan all pages (will auto-navigate)
-   - Click "Classify" to get AI recommendations
-   - Review the results
-   - Click "Apply" to add books to collections
+   - Click "Scan Page" to inspect the current page
+   - Click "Classify" to get AI recommendations for that page
+   - Click "Apply" to add books to collections on that page
+   - Or click "Auto Process" to classify the current page, apply the changes, and move to the next page automatically
 
 ### Configuration
 
@@ -55,13 +54,15 @@ A Tampermonkey userscript that automatically classifies your unorganized Kindle 
 - **API Key**: Your API key
 - **Model**: Default is `gpt-4o-mini` (recommended for cost-effectiveness)
 - **Batch Size**: Number of books to classify per API call (default: 10)
-- **Delay**: Delay between API calls in milliseconds (default: 3000)
+- **Request Delay**: Delay between API calls in milliseconds (default: 3000)
+- **Next Page Delay**: Delay before moving to the next page in auto mode (default: 2500)
 
 ### How It Works
 
-1. **Scan**: Detects books and their classification status across all pages
+1. **Scan**: Detects books and their classification status on the current page
 2. **Classify**: Sends book titles and authors to AI with your collection list
 3. **Apply**: Simulates clicking through the UI to add books to collections
+4. **Auto Process**: Repeats the same page workflow, then advances to the next page until the library is done
 
 ### Privacy & Security
 
@@ -72,9 +73,9 @@ A Tampermonkey userscript that automatically classifies your unorganized Kindle 
 
 ### Troubleshooting
 
-**Books not detected on other pages?**
-- The script now automatically waits for page content to load
-- If issues persist, try increasing the "Delay" setting
+**Auto Process stopped between pages?**
+- Keep the Kindle library tab open and visible while the script is running
+- If Amazon loads slowly, try increasing the "Next Page Delay" setting
 
 **Classification failed?**
 - Check your API key is valid
